@@ -51,7 +51,7 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User> | undefined,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   async register(data: {
     openId: string;
@@ -62,6 +62,16 @@ export class AuthService {
     email?: string;
     phone?: string;
   }): Promise<{ accessToken: string; user: User }> {
+    // SECURITY: Validate required password
+    if (!data.password || data.password.trim().length < 8) {
+      throw new BadRequestException("Password must be at least 8 characters");
+    }
+
+    // SECURITY: Validate required fields
+    if (!data.openId || data.openId.trim().length === 0) {
+      throw new BadRequestException("OpenID is required");
+    }
+
     const normalizedPhone = data.phone ? normalizePhone(data.phone) : null;
     if (!this.userRepo) {
       const existing = this.localUsers.get(data.openId);
@@ -106,6 +116,8 @@ export class AuthService {
   async validateUserWithPassword(identifier: string, password?: string): Promise<User> {
     const normalizedIdentifier = identifier.trim();
     const phone = normalizePhone(normalizedIdentifier);
+
+    // SECURITY: Do not auto-create users - they must be registered first
     if (!this.userRepo) {
       const user = [...this.localUsers.values()].find((candidate) =>
         [candidate.openId, candidate.email, candidate.phone, candidate.name]
@@ -116,11 +128,15 @@ export class AuthService {
       if (user.passwordHash && password && !verifyPassword(password.trim(), user.passwordHash)) {
         throw new UnauthorizedException("Invalid password");
       }
+      // SECURITY: Require password if user has one set
+      if (user.passwordHash && !password) {
+        throw new UnauthorizedException("Password required");
+      }
       user.lastSignedIn = new Date();
       return user;
     }
 
-    let user = await this.userRepo.findOne({
+    const user = await this.userRepo.findOne({
       where: [
         { openId: normalizedIdentifier },
         { email: normalizedIdentifier.toLowerCase() },
@@ -129,22 +145,17 @@ export class AuthService {
       ],
       relations: ["hospital"],
     });
+
+    // SECURITY: Do not auto-create users with elevated roles
     if (!user) {
-      user = this.userRepo.create({
-        openId: normalizedIdentifier,
-        hospitalId: 1,
-        name: normalizedIdentifier,
-        role: "DOCTOR",
-        phone: /^\+?\d{7,15}$/.test(phone) ? phone : null,
-      });
-      if (password) {
-        user.passwordHash = hashPassword(password.trim());
-      }
-      user = await this.userRepo.save(user);
-      return user;
+      throw new UnauthorizedException("User not found. Please register first.");
     }
 
-    if (user.passwordHash && password) {
+    // SECURITY: Require password verification if user has a password
+    if (user.passwordHash) {
+      if (!password) {
+        throw new UnauthorizedException("Password required");
+      }
       const isMatch = verifyPassword(password.trim(), user.passwordHash);
       if (!isMatch) {
         throw new UnauthorizedException("Invalid password");
@@ -204,16 +215,9 @@ export class AuthService {
     const targetHospitalId = facilityId || currentUser.hospitalId || 1;
     const contacts = this.userRepo
       ? await this.userRepo.find({
-          where: { hospitalId: targetHospitalId },
-          order: { name: "ASC" },
-        })
-<<<<<<< HEAD
-      : [...this.localUsers.values()].filter((user) => user.hospitalId === currentUser.hospitalId);
-
-    return contacts
-      .filter((user) => user.id !== currentUser.id)
-      .filter((user) => !["PATIENT"].includes(String(user.role)))
-=======
+        where: { hospitalId: targetHospitalId },
+        order: { name: "ASC" },
+      })
       : [...this.localUsers.values()].filter((u) => (u.hospitalId || 1) === targetHospitalId);
 
     const doctorRoles = ["DOCTOR", "CHIEF_DOCTOR", "doctor", "chief_doc"];
@@ -225,7 +229,6 @@ export class AuthService {
         const role = String(user.role);
         return doctorRoles.includes(role) || staffRoles.includes(role);
       })
->>>>>>> 3cca896 (Fix staff chat and database integration)
       .map((user) => ({
         id: user.id,
         name: user.name || user.openId,

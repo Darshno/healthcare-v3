@@ -181,7 +181,14 @@ export async function ensureServerSession(
   if (!baseUrl) return null;
 
   const identifier = profile.phone ? normalizePhone(profile.phone) : profile.id;
-  const password = passcode || "staff_auth_default_pin_1234";
+
+  // SECURITY: Require passcode - no default password
+  if (!passcode || passcode.trim().length === 0) {
+    console.warn("No passcode provided for server session");
+    return null;
+  }
+
+  const password = passcode;
 
   // 1. Try login first
   try {

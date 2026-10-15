@@ -41,7 +41,8 @@ export async function upsertUser(user: InsertUser): Promise<User | undefined> {
       email: user.email ?? null,
       loginMethod: user.loginMethod ?? null,
       passwordHash: user.passwordHash ?? null,
-      role: (user.role as any) ?? (user.openId === ENV.ownerOpenId ? "ADMIN" : "DOCTOR"),
+      // SECURITY: Default to PATIENT role, not DOCTOR
+      role: (user.role as any) ?? (user.openId === ENV.ownerOpenId ? "ADMIN" : "PATIENT"),
       lastSignedIn: user.lastSignedIn ?? new Date(),
     });
   } else {

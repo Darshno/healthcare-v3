@@ -70,25 +70,11 @@ export function useChatRealtime(channel: string | null, sender: Sender | null) {
     const refresh = async () => {
       setConnectionState("connecting");
       try {
-<<<<<<< HEAD
-        await authorizeSupabaseChat();
-        const { data, error: queryError } = await supabase.from("messages").select("id,sender_id,content,created_at,read_at").eq("conversation_id", conversationId).order("created_at", { ascending: true });
-        if (queryError) throw queryError;
-        if (cancelled) return;
-        addMessages((data ?? []) as Row[]);
-        setUnreadCount((data ?? []).filter((row) => row.sender_id !== currentUserId && !row.read_at).length);
-        await supabase.rpc("mark_conversation_read", { target_conversation: conversationId });
-        setLoaded(true);
-        channel = supabase.channel(`conversation:${conversationId}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` }, (payload) => addMessages([payload.new as Row])).subscribe((status) => {
-          if (!cancelled) setConnectionState(status === "SUBSCRIBED" ? "open" : status === "CHANNEL_ERROR" ? "error" : "connecting");
-        });
-=======
         await loadMessages();
         if (!cancelled) {
           setConnectionState("open");
           setLoaded(true);
         }
->>>>>>> 3cca896 (Fix staff chat and database integration)
       } catch (cause) {
         if (!cancelled) {
           setConnectionState("error");

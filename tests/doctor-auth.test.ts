@@ -14,21 +14,18 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
   },
 }));
 
-<<<<<<< HEAD
-=======
 vi.mock("expo-linking", () => ({
   createURL: vi.fn((path: string) => `manus://${path}`),
   canOpenURL: vi.fn(async () => true),
-  openURL: vi.fn(async () => {}),
+  openURL: vi.fn(async () => { }),
 }));
 
 vi.mock("expo-secure-store", () => ({
   getItemAsync: vi.fn(async () => null),
-  setItemAsync: vi.fn(async () => {}),
-  deleteItemAsync: vi.fn(async () => {}),
+  setItemAsync: vi.fn(async () => { }),
+  deleteItemAsync: vi.fn(async () => { }),
 }));
 
->>>>>>> 3cca896 (Fix staff chat and database integration)
 import {
   createUserProfile,
   authenticateUser,

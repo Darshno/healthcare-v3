@@ -29,8 +29,9 @@ export const appRouter = router({
   sync: router({
     /**
      * Push: client sends offline operations; server replays and acknowledges.
+     * SECURITY: Now requires authentication and validates hospital ownership.
      */
-    push: publicProcedure
+    push: protectedProcedure
       .input(z.object({
         hospitalId: z.number().int().positive().optional(),
         operations: z.array(z.object({
@@ -42,6 +43,11 @@ export const appRouter = router({
         })).min(1).max(100),
       }))
       .mutation(async ({ ctx, input }) => {
+        // SECURITY: Validate hospital access
+        if (ctx.user && input.hospitalId) {
+          const { validateHospitalAccess } = await import("./_core/auth/trpc-auth");
+          validateHospitalAccess(ctx.user, input.hospitalId);
+        }
         const ops = deduplicateOperations(input.operations);
         const ds = await getDataSource();
         if (!ds) {
@@ -210,13 +216,19 @@ export const appRouter = router({
 
     /**
      * Pull: client requests changes since last sync timestamp.
+     * SECURITY: Now requires authentication and validates hospital ownership.
      */
-    pull: publicProcedure
+    pull: protectedProcedure
       .input(z.object({
         hospitalId: z.number().int().positive(),
         since: z.number().int().nonnegative(),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
+        // SECURITY: Validate hospital access
+        if (ctx.user) {
+          const { validateHospitalAccess } = await import("./_core/auth/trpc-auth");
+          validateHospitalAccess(ctx.user, input.hospitalId);
+        }
         const ds = await getDataSource();
         if (!ds) return { patients: [], queue: [], since: input.since };
 
@@ -242,9 +254,17 @@ export const appRouter = router({
   }),
 
   beds: router({
-    getByFacility: publicProcedure
+    /**
+     * SECURITY: Now requires authentication and validates hospital ownership.
+     */
+    getByFacility: protectedProcedure
       .input(z.object({ hospitalId: z.string() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
+        // SECURITY: Validate hospital access
+        if (ctx.user) {
+          const { validateHospitalAccess } = await import("./_core/auth/trpc-auth");
+          validateHospitalAccess(ctx.user, parseInt(input.hospitalId));
+        }
         const ds = await getDataSource();
         if (!ds) return { units: [], beds: [] };
 
@@ -256,17 +276,17 @@ export const appRouter = router({
         const unitIds = units.map((u) => u.id);
         const beds = unitIds.length > 0
           ? await bedRepo
-              .createQueryBuilder("bed")
-              .where("bed.unitId IN (:...unitIds)", { unitIds })
-              .getMany()
+            .createQueryBuilder("bed")
+            .where("bed.unitId IN (:...unitIds)", { unitIds })
+            .getMany()
           : [];
 
         return { units, beds };
       }),
 
-    getUnitStats: publicProcedure
+    getUnitStats: protectedProcedure
       .input(z.object({ unitId: z.string() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
         const ds = await getDataSource();
         if (!ds) return { unitId: input.unitId, totalBeds: 0, availableBeds: 0, occupiedBeds: 0, maintenanceBeds: 0, occupancyRate: 0 };
 
@@ -294,16 +314,19 @@ export const appRouter = router({
         };
       }),
 
-    getAvailableBeds: publicProcedure
+    getAvailableBeds: protectedProcedure
       .input(z.object({ unitId: z.string() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
         const ds = await getDataSource();
         if (!ds) return [];
         const bedRepo = ds.getRepository(Bed);
         return bedRepo.find({ where: { unitId: parseInt(input.unitId), status: "available" } });
       }),
 
-    updateBedStatus: publicProcedure
+    /**
+     * SECURITY: Now requires authentication.
+     */
+    updateBedStatus: protectedProcedure
       .input(z.object({
         bedId: z.string(),
         status: z.enum(["available", "occupied", "maintenance"]),
@@ -393,9 +416,9 @@ export const appRouter = router({
         return [];
       }),
 
-    getOccupancyHistory: publicProcedure
+    getOccupancyHistory: protectedProcedure
       .input(z.object({ bedId: z.string() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
         const ds = await getDataSource();
         if (!ds) return [];
         const bedOccRepo = ds.getRepository(BedOccupancy);
@@ -408,14 +431,14 @@ export const appRouter = router({
   }),
 
   medicines: router({
-    getAll: publicProcedure.query(async () => {
+    getAll: protectedProcedure.query(async ({ ctx }) => {
       const ds = await getDataSource();
       if (!ds) return [];
       const medicineRepo = ds.getRepository(Medicine);
       return medicineRepo.find({ order: { name: "ASC" } });
     }),
 
-    create: publicProcedure
+    create: protectedProcedure
       .input(z.object({
         name: z.string(),
         localName: z.string().optional(),
@@ -433,7 +456,7 @@ export const appRouter = router({
         return medicineRepo.save(medicine);
       }),
 
-    recordTransaction: publicProcedure
+    recordTransaction: protectedProcedure
       .input(z.object({
         medicineId: z.number().int(),
         type: z.enum(["restock", "dispense", "adjustment"]),
@@ -451,9 +474,9 @@ export const appRouter = router({
         return inventoryRepo.save(tx);
       }),
 
-    getTransactions: publicProcedure
+    getTransactions: protectedProcedure
       .input(z.object({ medicineId: z.number().int() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
         const ds = await getDataSource();
         if (!ds) return [];
         const inventoryRepo = ds.getRepository(InventoryTransaction);
@@ -464,7 +487,7 @@ export const appRouter = router({
         });
       }),
 
-    getLowStock: publicProcedure.query(async () => {
+    getLowStock: protectedProcedure.query(async ({ ctx }) => {
       const ds = await getDataSource();
       if (!ds) return [];
       // Return medicines where total restocked - total dispensed < minimumStock

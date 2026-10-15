@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, Body, UseGuards, Query, Res, Logger } from "@nestjs/common";
+import { Controller, Post, Get, Param, Body, UseGuards, Query, Res, Logger, ForbiddenException, Request } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Response } from "express";
@@ -8,9 +8,11 @@ import { QueueRealtimeService } from "../queue/queue-realtime.service";
 import { CacheService } from "../redis/cache.service";
 import { TriageResult } from "../database/entities";
 import { JwtAuthGuard } from "./auth/jwt-auth.guard";
+import { HospitalAccessGuard } from "../_core/auth/hospital-auth.guard";
+import type { User } from "../database/entities";
 
 @Controller("api/queue")
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, HospitalAccessGuard)
 export class QueueController {
   private readonly logger = new Logger(QueueController.name);
 
@@ -18,7 +20,19 @@ export class QueueController {
     private readonly patientQueue: PatientQueueService,
     private readonly realtime: QueueRealtimeService,
     private readonly cache: CacheService,
-  ) {}
+  ) { }
+
+  /**
+   * SECURITY: Validates hospital ownership before enqueueing
+   */
+  private validateHospitalAccess(user: User, hospitalId: number): void {
+    if (user.role === "ADMIN" || user.role === "CHIEF_DOCTOR") {
+      return; // Admins can access any hospital
+    }
+    if (user.hospitalId !== hospitalId) {
+      throw new ForbiddenException("You can only manage queues in your own hospital");
+    }
+  }
 
   @Post("enqueue")
   async enqueue(
@@ -30,7 +44,13 @@ export class QueueController {
       careCategory: "emergency" | "urgent" | "priority" | "routine";
       priorityReason?: string;
     },
+    @Request() req?: any,
   ) {
+    // SECURITY: Validate hospital ownership
+    if (req) {
+      this.validateHospitalAccess(req.user as User, body.hospitalId);
+    }
+
     const job = await this.patientQueue.enqueue(body);
     return { jobId: job.id, status: "queued" };
   }
@@ -39,7 +59,13 @@ export class QueueController {
   async callNext(
     @Param("hospitalId") hospitalId: string,
     @Query("serviceType") serviceType?: string,
+    @Request() req?: any,
   ) {
+    // SECURITY: Validate hospital ownership
+    if (req) {
+      this.validateHospitalAccess(req.user as User, Number(hospitalId));
+    }
+
     const job = await this.patientQueue.callNext(Number(hospitalId), serviceType);
     return { jobId: job.id, status: "calling" };
   }
@@ -48,7 +74,13 @@ export class QueueController {
   async call(
     @Param("hospitalId") hospitalId: string,
     @Param("patientId") patientId: string,
+    @Request() req?: any,
   ) {
+    // SECURITY: Validate hospital ownership
+    if (req) {
+      this.validateHospitalAccess(req.user as User, Number(hospitalId));
+    }
+
     const job = await this.patientQueue.call(Number(hospitalId), Number(patientId));
     return { jobId: job.id, status: "calling" };
   }
@@ -57,7 +89,13 @@ export class QueueController {
   async complete(
     @Param("hospitalId") hospitalId: string,
     @Param("patientId") patientId: string,
+    @Request() req?: any,
   ) {
+    // SECURITY: Validate hospital ownership
+    if (req) {
+      this.validateHospitalAccess(req.user as User, Number(hospitalId));
+    }
+
     const job = await this.patientQueue.complete(Number(hospitalId), Number(patientId));
     return { jobId: job.id, status: "completed" };
   }
@@ -67,7 +105,13 @@ export class QueueController {
     @Param("hospitalId") hospitalId: string,
     @Param("patientId") patientId: string,
     @Body() body: { targetHospitalId: number },
+    @Request() req?: any,
   ) {
+    // SECURITY: Validate hospital ownership
+    if (req) {
+      this.validateHospitalAccess(req.user as User, Number(hospitalId));
+    }
+
     const job = await this.patientQueue.transfer(
       Number(hospitalId),
       Number(patientId),
@@ -80,7 +124,13 @@ export class QueueController {
   async pause(
     @Param("hospitalId") hospitalId: string,
     @Param("patientId") patientId: string,
+    @Request() req?: any,
   ) {
+    // SECURITY: Validate hospital ownership
+    if (req) {
+      this.validateHospitalAccess(req.user as User, Number(hospitalId));
+    }
+
     const job = await this.patientQueue.pause(Number(hospitalId), Number(patientId));
     return { jobId: job.id, status: "paused" };
   }
@@ -156,7 +206,7 @@ export class TriageController {
   constructor(
     private readonly triageQueue: TriageQueueService,
     @InjectRepository(TriageResult) private readonly triageRepo: Repository<TriageResult>,
-  ) {}
+  ) { }
 
   @Post("assess")
   async assess(

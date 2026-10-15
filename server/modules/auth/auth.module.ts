@@ -29,12 +29,14 @@ const hasDatabase = isDatabaseReachable();
     ...(hasDatabase ? [TypeOrmModule.forFeature([User])] : []),
     PassportModule.register({ defaultStrategy: "jwt" }),
     JwtModule.register({
-      secret: process.env.JWT_SECRET ?? "dev-secret-change-in-production",
-      signOptions: { expiresIn: "365d" },
+      secret: process.env.JWT_SECRET ?? (process.env.NODE_ENV === "production"
+        ? (() => { throw new Error("JWT_SECRET environment variable is required in production"); })()
+        : "dev-secret-change-in-production"),
+      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? "7d" as any },
     }),
   ],
   providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
   exports: [AuthService, JwtModule],
 })
-export class AuthModule {}
+export class AuthModule { }
