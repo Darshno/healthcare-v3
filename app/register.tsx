@@ -14,7 +14,7 @@ import {
 import { useHealth } from "@/lib/health/store";
 import type { Patient } from "@/lib/health/types";
 
-import { analyzeDiseaseRuleBased } from "@/lib/health/aiTriage";
+import { analyzeClinicalTriage, analyzeDiseaseRuleBased } from "@/lib/health/aiTriage";
 
 type Sex = Patient["sex"];
 
@@ -41,7 +41,11 @@ export default function RegisterPatientScreen() {
   const [disease, setDisease] = useState("");
   const [createVaccines, setCreateVaccines] = useState(true);
 
-  const triageAnalysis = disease.trim() ? analyzeDiseaseRuleBased(disease) : null;
+  const triageContext = age.trim() && Number.isFinite(Number(age)) && Number(age) > 0
+    ? { age: Number(age) }
+    : undefined;
+  const triageAnalysis = disease.trim() ? analyzeDiseaseRuleBased(disease, triageContext) : null;
+  const clinicalTriage = disease.trim() ? analyzeClinicalTriage(disease, triageContext) : null;
   const triageLevel = triageAnalysis ? triageAnalysis.priority : "routine";
   const triageColor = TRIAGE_COLORS[triageLevel];
   
@@ -205,18 +209,23 @@ export default function RegisterPatientScreen() {
             <MaterialIcons name="health-and-safety" size={22} color={triageColor.fg} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.triageLabel, { color: triageColor.fg }]}>
-                Auto Triage: {triageColor.label} ({triageAnalysis.recommendedSpecialization})
+                Suggested staff priority: {triageColor.label} ({triageAnalysis.recommendedSpecialization})
               </Text>
               <Text style={[styles.triageSub, { color: triageColor.fg }]}>
-                {triageAnalysis.clinicalSummary}
+                {triageAnalysis.clinicalSummary} Clinical review required; this is not a diagnosis.
               </Text>
+              {clinicalTriage?.missingInformation.length ? (
+                <Text style={[styles.triageSub, { color: triageColor.fg }]}>
+                  Follow-up information: {clinicalTriage.missingInformation.join(", ")}.
+                </Text>
+              ) : null}
             </View>
           </View>
         ) : (
           <View style={[styles.triagePreview, { backgroundColor: TRIAGE_COLORS.routine.bg }]}>
             <MaterialIcons name="info-outline" size={18} color={TRIAGE_COLORS.routine.fg} />
             <Text style={[styles.triageLabel, { color: TRIAGE_COLORS.routine.fg }]}>
-              Auto Triage: ✅ Routine (no symptoms entered)
+              Triage not assessed — no symptoms entered.
             </Text>
           </View>
         )}

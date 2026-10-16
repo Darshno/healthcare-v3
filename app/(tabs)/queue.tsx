@@ -101,7 +101,9 @@ export default function QueueScreen() {
             ? priorityReasonLabel(item.priorityReason)
             : "Routine care";
 
-          const assignedDoctor = item.doctorName ? `👨‍⚕️ ${item.doctorName}` : "👨‍⚕️ Duty Doctor";
+          const assignedDoctor = item.doctorName
+            ? `👨‍⚕️ ${item.doctorName}`
+            : "👨‍⚕️ Doctor assignment pending";
 
           return (
             <Pressable

@@ -310,13 +310,13 @@ export function HealthProvider({ children, syncTransport }: PropsWithChildren<{ 
     const timestamp = Date.now();
 
     // Perform disease triage & doctor matching
-    const triageResult = analyzeDiseaseRuleBased(input.disease || "");
+    const triageResult = analyzeDiseaseRuleBased(input.disease || "", { age: input.age });
     const priority = triageResult.priority;
     const priorityReason = triageResult.priorityReason;
 
     // Doctor matching
-    let matchedDoctorName = "Dr. General Medical Officer";
-    let matchedDoctorId = "doc-duty-01";
+    let matchedDoctorName: string | undefined;
+    let matchedDoctorId: string | undefined;
     let matchedSpecialty = triageResult.recommendedSpecialization;
 
     getRegisteredUsers().then((users) => {
@@ -380,7 +380,9 @@ export function HealthProvider({ children, syncTransport }: PropsWithChildren<{ 
       facilityId: state.currentUser.facilityId,
       patientId,
       type: "triage",
-      note: `Triage (${priority}): ${triageResult.clinicalSummary}. Matched Doc: ${matchedDoctorName}.`,
+      note: `Triage (${priority}): ${triageResult.clinicalSummary}. Doctor assignment: ${
+        matchedDoctorName ?? "not recorded"
+      }. Recommended specialty: ${matchedSpecialty}.`,
       createdAt: timestamp,
       syncState: "pending",
     };
@@ -406,14 +408,17 @@ export function HealthProvider({ children, syncTransport }: PropsWithChildren<{ 
     }
 
     const patientRecord = state.patients.find((p) => p.id === input.patientId);
-    const triageResult = analyzeDiseaseRuleBased(patientRecord?.disease || "");
+    const triageResult = analyzeDiseaseRuleBased(
+      patientRecord?.disease || "",
+      patientRecord ? { age: patientRecord.age } : undefined,
+    );
 
     const queueId = makeId("queue");
     const timestamp = Date.now();
     const token = 100 + (state.queue.length + 1);
 
-    let matchedDoctorName = "Dr. General Duty Doctor";
-    let matchedDoctorId = "doc-duty-01";
+    let matchedDoctorName: string | undefined;
+    let matchedDoctorId: string | undefined;
 
     getRegisteredUsers().then((users) => {
       const match = matchBestDoctor(

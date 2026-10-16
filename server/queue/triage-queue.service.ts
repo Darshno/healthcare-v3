@@ -16,6 +16,7 @@ export class TriageQueueService {
     hospitalId: number;
     serviceType: string;
     screeningData: Record<string, unknown>;
+    symptomText?: string;
     clinicianOverride?: {
       careCategory: string;
       reason: string;

@@ -205,7 +205,7 @@ function PortalBoard({
                     🩺 {patientRecord?.disease || item.service || "General OPD"}
                   </Text>
                   <Text style={{ color: "#2369A5", fontWeight: "700", fontSize: 11, marginTop: 2 }}>
-                    👨‍⚕️ Assigned: {item.doctorName || "Duty Doctor"}
+                    👨‍⚕️ {item.doctorName ? `Assigned: ${item.doctorName}` : "Doctor assignment pending"}
                   </Text>
                 </View>
                 <View style={[styles.cell, styles.colActions, styles.actionCell]}>
@@ -242,8 +242,8 @@ function PortalBoard({
                   <VaccinationPanel 
                     patient={patientRecord} 
                     vaccines={patientVaccines} 
-                    doctorName={user?.name || "Duty Doctor"}
-                    onMarkAdministered={(recordId) => markVaccineAdministered(recordId, user?.name || "Duty Doctor")}
+                    doctorName={user?.name || "Staff user"}
+                    onMarkAdministered={(recordId) => markVaccineAdministered(recordId, user?.name || "Staff user")}
                   />
                 </View>
               )}

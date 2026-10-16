@@ -16,9 +16,14 @@ describe("aiTriage & Doctor Matching", () => {
   });
 
   it("classifies maternal pregnancy symptoms correctly", () => {
-    const result = analyzeDiseaseRuleBased("Pregnant woman in severe labor pain");
+    const result = analyzeDiseaseRuleBased("Pregnant woman reports vaginal bleeding");
     expect(result.priority).toBe("emergency");
     expect(result.recommendedSpecialization).toBe("Obstetrics & Gynecology");
+  });
+
+  it("does not elevate negated chest pain", () => {
+    const result = analyzeDiseaseRuleBased("Patient denies chest pain");
+    expect(result.priority).not.toBe("emergency");
   });
 
   it("matches the best suited doctor with the lowest queue load", () => {
@@ -55,5 +60,25 @@ describe("aiTriage & Doctor Matching", () => {
     const matched = matchBestDoctor("hosp-1", "Pediatrics / Child Health", mockDoctors, currentQueue);
     expect(matched?.id).toBe("doc-2");
     expect(matched?.name).toBe("Dr. Bob");
+  });
+
+  it("does not fabricate a doctor when the facility directory has no clinicians", () => {
+    const matched = matchBestDoctor("missing-facility", "General Medicine (MBBS)", [], []);
+    expect(matched).toBeNull();
+  });
+
+  it("does not recommend doctors from another facility", () => {
+    const doctor = {
+      id: "doc-other",
+      name: "Dr. Other",
+      role: "doctor" as const,
+      doctorId: "DOC-OTHER",
+      specialization: "General Medicine (MBBS)",
+      facilityId: "other-hospital",
+      facilityName: "Other Hospital",
+      createdAt: Date.now(),
+      lastLoginAt: Date.now(),
+    };
+    expect(matchBestDoctor("hosp-1", "General Medicine (MBBS)", [doctor], [])).toBeNull();
   });
 });
