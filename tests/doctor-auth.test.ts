@@ -26,15 +26,14 @@ vi.mock("expo-secure-store", () => ({
   deleteItemAsync: vi.fn(async () => { }),
 }));
 
-import {
-  createUserProfile,
-  authenticateUser,
-} from "../lib/health/userAuth";
-import type { DoctorProfile } from "../lib/health/userAuth";
+vi.mock("react-native", () => ({
+  Platform: { OS: "web" },
+}));
 
 describe("Doctor Authentication & Profile Creation", () => {
   it("creates a doctor profile with formatted prefix and details", async () => {
-    const profile = (await createUserProfile({
+    const { createUserProfile } = await import("../lib/health/userAuth");
+    const profile = await createUserProfile({
       name: "Sunita Patel",
       role: "doctor",
       doctorId: "MCI-99881",
@@ -43,9 +42,10 @@ describe("Doctor Authentication & Profile Creation", () => {
       facilityId: "hosp-1",
       phone: "9876543210",
       passcode: "1234",
-    })) as DoctorProfile;
+    });
 
     expect(profile.name).toBe("Dr. Sunita Patel");
+    if (profile.role !== "doctor") throw new Error("Expected a doctor profile");
     expect(profile.doctorId).toBe("MCI-99881");
     expect(profile.specialization).toBe("Pediatrics / Child Health");
     expect(profile.facilityName).toBe("Nandipur PHC");
@@ -53,24 +53,28 @@ describe("Doctor Authentication & Profile Creation", () => {
   });
 
   it("authenticates existing doctor by MCI ID with correct PIN", async () => {
+    const { authenticateUser } = await import("../lib/health/userAuth");
     const doctor = await authenticateUser("MCI-99881", "1234", "doctor");
     expect(doctor).toBeDefined();
     expect(doctor.name).toBe("Dr. Sunita Patel");
   });
 
   it("authenticates existing doctor by phone number with correct PIN", async () => {
+    const { authenticateUser } = await import("../lib/health/userAuth");
     const doctor = await authenticateUser("987 654 3210", "1234", "doctor");
     expect(doctor).toBeDefined();
     expect(doctor.name).toBe("Dr. Sunita Patel");
   });
 
   it("rejects login with wrong passcode", async () => {
+    const { authenticateUser } = await import("../lib/health/userAuth");
     await expect(authenticateUser("MCI-99881", "9999", "doctor")).rejects.toThrow(
       "Incorrect PIN",
     );
   });
 
   it("throws when user is not found", async () => {
+    const { authenticateUser } = await import("../lib/health/userAuth");
     await expect(authenticateUser("MCI-000000", "1234", "doctor")).rejects.toThrow(
       "No user found",
     );

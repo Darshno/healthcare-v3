@@ -706,7 +706,7 @@ export function PatientPortal() {
               </Pressable>
             </View>
 
-            <Text style={styles.modalSub}>Select consultation service for today's visit:</Text>
+            <Text style={styles.modalSub}>Select consultation service for today&apos;s visit:</Text>
 
             {["General OPD Consultation", "Maternal & Antenatal Care", "Child Health & Immunization", "Chronic Care & BP/Sugar"].map((srv) => (
               <Pressable

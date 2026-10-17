@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Job } from "bull";
 import { TriageQueueProcessor, parseDecisionSupportOutput, type TriageJob } from "../server/queue/triage-queue.processor";
 import { invokeLLM } from "../server/_core/llm";
+import { analyzeClinicalTriage } from "../shared/clinical-triage";
 
 vi.mock("../server/_core/llm", () => ({
   invokeLLM: vi.fn(),
@@ -89,6 +90,24 @@ describe("Backend triage decision support", () => {
     expect(result.structuredTriage.urgency).toBe(result.careCategory);
     expect(result.structuredTriage.requiresHumanReview).toBe(true);
     expect(result.structuredTriage.decisionSupport).toBeUndefined();
+    expect(result.structuredTriage.uncertainty.level).toBe("high");
+    expect(result.structuredTriage.recommendedNextAction).toContain("clinician review");
+  });
+
+  it("does not turn an unknown symptom report into an apparently low-risk result", () => {
+    const result = analyzeClinicalTriage("A symptom I cannot identify");
+
+    expect(result.urgency).toBe("undetermined");
+    expect(result.uncertainty.level).toBe("high");
+    expect(result.requiresHumanReview).toBe(true);
+    expect(result.recommendedNextAction).toContain("clinician review");
+  });
+
+  it("routes contradictory symptom wording to human review", () => {
+    const result = analyzeClinicalTriage("No chest pain earlier; now chest pain");
+
+    expect(result.requiresHumanReview).toBe(true);
+    expect(result.uncertainty.notes).toContain("The same symptom is both affirmed and denied.");
   });
 
   it("does not call an external provider unless explicitly enabled", async () => {

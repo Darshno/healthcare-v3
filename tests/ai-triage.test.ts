@@ -81,4 +81,20 @@ describe("aiTriage & Doctor Matching", () => {
     };
     expect(matchBestDoctor("hosp-1", "General Medicine (MBBS)", [doctor], [])).toBeNull();
   });
+
+  it("does not present a non-doctor directory entry as assigned", () => {
+    const worker = {
+      id: "worker-1",
+      name: "Unregistered Doctor Name",
+      role: "asha_worker" as const,
+      workerId: "ASHA-1",
+      designation: "ASHA Worker" as const,
+      facilityId: "hosp-1",
+      facilityName: "Nandipur PHC",
+      createdAt: 0,
+      lastLoginAt: 0,
+    };
+
+    expect(matchBestDoctor("hosp-1", "General Medicine (MBBS)", [worker], [])).toBeNull();
+  });
 });
